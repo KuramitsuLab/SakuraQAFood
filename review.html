@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食べ物クイズレビュー - レビュー画面</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="review-header">
+            <div class="header-top">
+                <h1>🍽️ 食べ物クイズレビュー</h1>
+                <button class="btn btn-text" id="back-home-btn">ホームに戻る</button>
+            </div>
+            <div class="header-info">
+                <div class="progress-info">
+                    <span class="progress-text">問題 <span id="current-question">1</span> / <span id="total-questions">0</span></span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="review-content">
+            <!-- ローディング表示 -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>問題を読み込んでいます...</p>
+            </div>
+
+            <!-- エラー表示 -->
+            <div id="error-container" class="error-container" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h2>エラーが発生しました</h2>
+                <p id="error-message"></p>
+                <button class="btn btn-primary" id="retry-btn">再試行</button>
+                <button class="btn btn-secondary" id="error-home-btn">ホームに戻る</button>
+            </div>
+
+            <!-- 問題表示エリア -->
+            <div id="question-container" style="display: none;">
+                <section class="question-section">
+                    <h2 class="question-text" id="question-text">問題文がここに表示されます</h2>
+                </section>
+
+                <section class="answer-section">
+                    <h3>回答を選択してください</h3>
+                    <div class="choices" id="choices-container">
+                        <!-- 選択肢がJavaScriptで動的に生成されます -->
+                    </div>
+                </section>
+
+                <!-- 結果表示エリア -->
+                <section class="result-section" id="result-section" style="display: none;">
+                    <div class="result-card">
+                        <div class="result-header" id="result-header">
+                            <span class="result-icon" id="result-icon">✓</span>
+                            <h3 id="result-title">正解！</h3>
+                        </div>
+                        <div class="result-body">
+                            <div class="result-item">
+                                <span class="result-label">あなたの回答:</span>
+                                <span class="result-value" id="your-answer">選択肢</span>
+                            </div>
+                            <div class="result-item">
+                                <span class="result-label">正解:</span>
+                                <span class="result-value" id="correct-answer">正解の選択肢</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- コメント入力エリア（結果表示後に表示） -->
+                <section class="comment-section" id="comment-section" style="display: none;">
+                    <label for="comment-input">コメント（オプション）</label>
+                    <textarea
+                        id="comment-input"
+                        placeholder="この問題についてのコメントや気づいた点などを入力してください"
+                        rows="2"
+                        class="comment-input"
+                    ></textarea>
+                    <p class="comment-hint">コメントを入力したら「次の問題へ」または「レビュー完了」をクリックしてください</p>
+                </section>
+
+                <!-- アクションボタン -->
+                <section class="action-section">
+                    <button class="btn btn-primary btn-large" id="submit-btn" disabled>回答を提出</button>
+                    <button class="btn btn-primary btn-large" id="next-btn" style="display: none;">次の問題へ</button>
+                    <button class="btn btn-success btn-large" id="complete-btn" style="display: none;">レビュー完了</button>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- AWS設定ファイル（存在しない場合はAPI送信機能が無効化されます） -->
+    <script src="js/aws-config.js"></script>
+
+    <script src="js/github.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

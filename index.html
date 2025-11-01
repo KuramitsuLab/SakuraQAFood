@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食べ物クイズレビュー - ホーム</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1>🍽️ SakuraQA foodレビュー</h1>
+        </header>
+
+        <main class="home-content">
+            <section class="input-section">
+                <h2>レビュアー情報</h2>
+                <div class="form-group">
+                    <label for="reviewer-name">レビュアー名 <span class="required">*</span></label>
+                    <input
+                        type="text"
+                        id="reviewer-name"
+                        placeholder="名前を入力してください"
+                        class="form-input"
+                        required
+                    >
+                    <div class="error-message" id="name-error"></div>
+                </div>
+            </section>
+
+            <section class="quiz-set-section">
+                <h2>カテゴリを選択</h2>
+                <p class="section-description">レビューするカテゴリを選んでください</p>
+
+                <div id="loading-categories" class="loading-small">
+                    <div class="spinner-small"></div>
+                    <p>カテゴリを読み込んでいます...</p>
+                </div>
+
+                <div class="quiz-sets" id="quiz-sets" style="display: none;">
+                    <!-- カテゴリカードがJavaScriptで動的に生成されます -->
+                </div>
+
+                <div class="error-message" id="category-error"></div>
+            </section>
+
+            <div class="error-message global-error" id="global-error"></div>
+        </main>
+
+        <!-- 進捗確認ダイアログ -->
+        <div class="modal-overlay" id="progress-modal" style="display: none;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3>前回の続きがあります</h3>
+                </div>
+                <div class="modal-body">
+                    <p id="progress-message">問題 3 / 108 から再開できます。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="modal-resume-btn">続きから開始</button>
+                    <button class="btn btn-secondary" id="modal-restart-btn">最初から開始</button>
+                    <button class="btn btn-text" id="modal-cancel-btn">キャンセル</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script>
+        const QUESTIONS_PATH = 'food_quiz/questions.json';
+
+        // カテゴリアイコンのマッピング
+        const CATEGORY_ICONS = {
+            '食': '🍕',
+            '日本の食文化(現代)': '🍱',
+            'デフォルト': '🍽️'
+        };
+
+        // レビュアー名のバリデーション
+        function validateReviewerName() {
+            const reviewerName = document.getElementById('reviewer-name').value.trim();
+            const errorEl = document.getElementById('name-error');
+
+            if (!reviewerName) {
+                errorEl.textContent = 'レビュアー名を入力してください';
+                return false;
+            }
+
+            errorEl.textContent = '';
+            return true;
+        }
+
+        // カテゴリ別問題セットの開始
+        function startQuiz(category, questionCount) {
+            if (!validateReviewerName()) {
+                document.getElementById('reviewer-name').focus();
+                return;
+            }
+
+            const reviewerName = document.getElementById('reviewer-name').value.trim();
+
+            // 進捗があるかチェック
+            const progress = StorageManager.getProgress(reviewerName, category);
+
+            if (progress && progress.questionIndex >= 0) {
+                // 進捗がある場合はダイアログを表示
+                showProgressDialog(reviewerName, category, questionCount, progress.questionIndex);
+            } else {
+                // 進捗がない場合は直接開始
+                startReview(reviewerName, category, false);
+            }
+        }
+
+        // 進捗確認ダイアログを表示
+        function showProgressDialog(reviewerName, category, questionCount, lastIndex) {
+            const modal = document.getElementById('progress-modal');
+            const message = document.getElementById('progress-message');
+            const nextQuestion = lastIndex + 1;
+
+            message.textContent = `問題 ${nextQuestion} / ${questionCount} から再開できます。`;
+            modal.style.display = 'flex';
+
+            // ボタンのイベントリスナー（一度だけ設定）
+            document.getElementById('modal-resume-btn').onclick = () => {
+                modal.style.display = 'none';
+                startReview(reviewerName, category, true);
+            };
+
+            document.getElementById('modal-restart-btn').onclick = () => {
+                modal.style.display = 'none';
+                StorageManager.clearProgress(reviewerName, category);
+                startReview(reviewerName, category, false);
+            };
+
+            document.getElementById('modal-cancel-btn').onclick = () => {
+                modal.style.display = 'none';
+            };
+
+            // オーバーレイクリックで閉じる
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            };
+        }
+
+        // レビューを開始
+        function startReview(reviewerName, category, resume) {
+            // localStorageに保存
+            localStorage.setItem('current_reviewer', reviewerName);
+            localStorage.setItem('current_category', category);
+            localStorage.setItem('current_quiz_path', QUESTIONS_PATH);
+
+            // レビュー画面に遷移
+            window.location.href = 'review.html';
+        }
+
+        // カテゴリを読み込んで表示
+        async function loadCategories() {
+            try {
+                const response = await fetch(QUESTIONS_PATH);
+                if (!response.ok) {
+                    throw new Error('問題データの読み込みに失敗しました');
+                }
+
+                const questions = await response.json();
+
+                // カテゴリごとに問題数を集計
+                const categoryMap = {};
+                questions.forEach(q => {
+                    const category = q.category || 'その他';
+                    if (!categoryMap[category]) {
+                        categoryMap[category] = 0;
+                    }
+                    categoryMap[category]++;
+                });
+
+                // カテゴリカードを生成
+                const container = document.getElementById('quiz-sets');
+                container.innerHTML = '';
+
+                Object.entries(categoryMap).forEach(([category, count]) => {
+                    const card = document.createElement('div');
+                    card.className = 'quiz-card';
+                    card.dataset.category = category;
+                    card.dataset.count = count;
+
+                    const icon = CATEGORY_ICONS[category] || CATEGORY_ICONS['デフォルト'];
+
+                    card.innerHTML = `
+                        <div class="quiz-card-icon">${icon}</div>
+                        <h3>${category}</h3>
+                        <p class="quiz-description">${category}に関する問題</p>
+                        <div class="quiz-badge">${count}問</div>
+                    `;
+
+                    card.addEventListener('click', () => {
+                        startQuiz(category, count);
+                    });
+
+                    container.appendChild(card);
+                });
+
+                // ローディングを非表示、カテゴリを表示
+                document.getElementById('loading-categories').style.display = 'none';
+                container.style.display = 'grid';
+
+            } catch (error) {
+                console.error('カテゴリ読み込みエラー:', error);
+                document.getElementById('loading-categories').style.display = 'none';
+                document.getElementById('category-error').textContent =
+                    'カテゴリの読み込みに失敗しました: ' + error.message;
+            }
+        }
+
+        // イベントリスナーの設定
+        document.addEventListener('DOMContentLoaded', () => {
+            // レビュアー名の入力でエラーをクリア
+            document.getElementById('reviewer-name').addEventListener('input', () => {
+                document.getElementById('name-error').textContent = '';
+            });
+
+            // カテゴリを読み込む
+            loadCategories();
+        });
+    </script>
+</body>
+</html>
