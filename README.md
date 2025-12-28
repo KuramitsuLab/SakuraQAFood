@@ -34,7 +34,7 @@
 
 ### 本番環境（GitHub Pages）
 
-**URL**: https://obarayui.github.io/qareview_notimg/
+**URL**: https://kuramitsulab.github.io/SakuraQAFood/
 
 ブラウザで上記URLにアクセスすると、レビューツールが利用できます。
 
