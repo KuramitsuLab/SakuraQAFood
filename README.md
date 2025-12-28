@@ -34,7 +34,7 @@
 
 ### 本番環境（GitHub Pages）
 
-**URL**: https://kuramitsulab.github.io/SakuraQAFood/
+**URL**: https://kuramitsulab.github.io/SakuraQAReview/
 
 ブラウザで上記URLにアクセスすると、レビューツールが利用できます。
 
