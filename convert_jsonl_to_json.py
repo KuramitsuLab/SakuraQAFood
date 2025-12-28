@@ -34,9 +34,9 @@ def convert_jsonl_to_questions(ai_path, human_path, output_path):
             if i <= 40:
                 authored_by = "GPT"
             elif i <= 80:
-                authored_by = "Claude"
-            else:
                 authored_by = "Gemini"
+            else:
+                authored_by = "Claude"
 
             question = {
                 "questionID": f"Q{question_id:03d}",
