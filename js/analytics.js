@@ -409,8 +409,8 @@ const Analytics = {
             this.downloadJSONL();
         });
 
-        document.getElementById('downloadSummaryBtn').addEventListener('click', () => {
-            this.downloadSummary();
+        document.getElementById('downloadQuestionCSVBtn').addEventListener('click', () => {
+            this.downloadQuestionCSV();
         });
     },
 
@@ -430,25 +430,117 @@ const Analytics = {
     },
 
     /**
-     * 集計結果をJSON形式でダウンロード
+     * 問題別集計をWide形式のCSVでダウンロード
      */
-    downloadSummary() {
-        const summary = {
-            generated_at: new Date().toISOString(),
-            overall: this.overallStats,
-            by_author: this.authorStats,
-            by_reviewer: this.reviewerStats,
-            by_question: this.questionStats
-        };
+    downloadQuestionCSV() {
+        // すべてのレビュアーのリストを取得
+        const reviewers = [...new Set(this.reviews.map(r => r.reviewer_name || r.reviewerName))];
+        reviewers.sort(); // アルファベット順にソート
 
-        const content = JSON.stringify(summary, null, 2);
-        const blob = new Blob([content], { type: 'application/json' });
+        // 問題データをマップ化
+        const questionMap = new Map();
+        this.questions.forEach(q => {
+            questionMap.set(q.questionID, q);
+        });
+
+        // レビュー結果をquestion_id × reviewer でグループ化
+        const reviewsByQuestion = new Map();
+        this.reviews.forEach(review => {
+            const questionId = review.question_id || review.questionId;
+            const reviewer = review.reviewer_name || review.reviewerName;
+
+            if (!reviewsByQuestion.has(questionId)) {
+                reviewsByQuestion.set(questionId, {});
+            }
+
+            reviewsByQuestion.get(questionId)[reviewer] = {
+                answer: review.answer,
+                is_correct: review.is_correct || review.isCorrect
+            };
+        });
+
+        // CSVヘッダーを生成
+        const headers = [
+            'question_id',
+            'question',
+            'category',
+            'authored_by',
+            'choice_1',
+            'choice_2',
+            'choice_3',
+            'choice_4',
+            'correct_answer'
+        ];
+
+        // レビュアー別の列を追加
+        reviewers.forEach(reviewer => {
+            headers.push(`${reviewer}_answer`);
+            headers.push(`${reviewer}_is_correct`);
+        });
+
+        // CSV行を生成
+        const rows = [headers];
+
+        // すべての問題について行を生成
+        this.questions.forEach(question => {
+            const row = [
+                this.escapeCSV(question.questionID),
+                this.escapeCSV(question.question),
+                this.escapeCSV(question.category),
+                this.escapeCSV(question.authored_by),
+                this.escapeCSV(question.choice[0] || ''),
+                this.escapeCSV(question.choice[1] || ''),
+                this.escapeCSV(question.choice[2] || ''),
+                this.escapeCSV(question.choice[3] || ''),
+                this.escapeCSV(question.answer)
+            ];
+
+            // 各レビュアーの回答を追加
+            const questionReviews = reviewsByQuestion.get(question.questionID) || {};
+            reviewers.forEach(reviewer => {
+                const review = questionReviews[reviewer];
+                if (review) {
+                    row.push(this.escapeCSV(review.answer));
+                    row.push(review.is_correct ? 'true' : 'false');
+                } else {
+                    row.push('null');
+                    row.push('null');
+                }
+            });
+
+            rows.push(row);
+        });
+
+        // CSVに変換
+        const csv = rows.map(row => row.join(',')).join('\n');
+
+        // ダウンロード
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `sakuraqa-summary-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `sakuraqa-questions-${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
+    },
+
+    /**
+     * CSVフィールドのエスケープ
+     */
+    escapeCSV(value) {
+        if (value === null || value === undefined) {
+            return 'null';
+        }
+
+        const str = String(value);
+
+        // カンマ、改行、ダブルクォートが含まれる場合はダブルクォートで囲む
+        if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+            // ダブルクォートを2つにエスケープ
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+
+        return str;
     },
 
     /**
