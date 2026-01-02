@@ -83,7 +83,7 @@ const QuizApp = {
             this.questions = filteredQuestions;
 
             // 進捗があればそこから開始、なければ0から
-            const progress = StorageManager.getProgress(this.reviewerName, this.category);
+            const progress = await StorageManager.getProgress(this.reviewerName, this.category);
             if (progress && progress.questionIndex >= 0 && progress.questionIndex < this.questions.length) {
                 this.currentIndex = progress.questionIndex;
                 console.log('進捗から再開:', this.currentIndex);

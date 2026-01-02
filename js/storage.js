@@ -340,13 +340,14 @@ const StorageManager = {
     },
 
     /**
-     * 進捗を保存
+     * 進捗を保存（API + localStorage）
      * @param {string} reviewerName - レビュアー名
      * @param {string} category - カテゴリ
      * @param {number} questionIndex - 現在の問題インデックス
      */
-    saveProgress(reviewerName, category, questionIndex) {
+    async saveProgress(reviewerName, category, questionIndex) {
         try {
+            // localStorageに保存（フォールバック）
             const progressData = this.getAllProgress();
             const key = `${reviewerName}__${category}`;
             progressData[key] = {
@@ -356,23 +357,42 @@ const StorageManager = {
                 timestamp: new Date().toISOString()
             };
             localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(progressData));
-            console.log('進捗を保存しました:', key, questionIndex);
+            console.log('進捗をlocalStorageに保存しました:', key, questionIndex);
+
+            // APIに保存を試みる
+            if (typeof AWS_CONFIG !== 'undefined' && AWS_CONFIG.apiEndpoint && AWS_CONFIG.enableS3Upload) {
+                await this.saveProgressToAPI(reviewerName, category, questionIndex);
+            }
         } catch (error) {
             console.error('進捗保存エラー:', error);
         }
     },
 
     /**
-     * 進捗を取得
+     * 進捗を取得（API優先、localStorageフォールバック）
      * @param {string} reviewerName - レビュアー名
      * @param {string} category - カテゴリ
-     * @returns {Object|null} 進捗データ（なければnull）
+     * @returns {Promise<Object|null>} 進捗データ（なければnull）
      */
-    getProgress(reviewerName, category) {
+    async getProgress(reviewerName, category) {
         try {
+            // まずAPIから取得を試みる
+            if (typeof AWS_CONFIG !== 'undefined' && AWS_CONFIG.apiEndpoint && AWS_CONFIG.enableS3Upload) {
+                const apiProgress = await this.getProgressFromAPI(reviewerName, category);
+                if (apiProgress) {
+                    console.log('進捗をAPIから取得しました:', apiProgress);
+                    return apiProgress;
+                }
+            }
+
+            // APIから取得できない場合はlocalStorageから取得
             const progressData = this.getAllProgress();
             const key = `${reviewerName}__${category}`;
-            return progressData[key] || null;
+            const localProgress = progressData[key] || null;
+            if (localProgress) {
+                console.log('進捗をlocalStorageから取得しました:', localProgress);
+            }
+            return localProgress;
         } catch (error) {
             console.error('進捗取得エラー:', error);
             return null;
@@ -407,6 +427,75 @@ const StorageManager = {
             console.log('進捗を削除しました:', key);
         } catch (error) {
             console.error('進捗削除エラー:', error);
+        }
+    },
+
+    /**
+     * 進捗をAPIに保存
+     * @param {string} reviewerName - レビュアー名
+     * @param {string} category - カテゴリ
+     * @param {number} questionIndex - 現在の問題インデックス
+     * @returns {Promise<boolean>} 成功したかどうか
+     */
+    async saveProgressToAPI(reviewerName, category, questionIndex) {
+        try {
+            const progressEndpoint = AWS_CONFIG.apiEndpoint.replace('/review', '/progress');
+
+            const response = await fetch(progressEndpoint, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    reviewerName,
+                    category,
+                    questionIndex
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('進捗をAPIに保存成功:', result);
+            return true;
+
+        } catch (error) {
+            console.error('進捗API保存エラー:', error);
+            return false;
+        }
+    },
+
+    /**
+     * 進捗をAPIから取得
+     * @param {string} reviewerName - レビュアー名
+     * @param {string} category - カテゴリ
+     * @returns {Promise<Object|null>} 進捗データ（なければnull）
+     */
+    async getProgressFromAPI(reviewerName, category) {
+        try {
+            const progressEndpoint = AWS_CONFIG.apiEndpoint.replace('/review', '/progress');
+            const url = `${progressEndpoint}?reviewer=${encodeURIComponent(reviewerName)}&category=${encodeURIComponent(category)}`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.success && result.progress ? result.progress : null;
+
+        } catch (error) {
+            console.error('進捗API取得エラー:', error);
+            return null;
         }
     },
 
