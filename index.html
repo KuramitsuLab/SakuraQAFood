@@ -224,8 +224,8 @@
                         <div class="quiz-badge">${count}問</div>
                     `;
 
-                    card.addEventListener('click', () => {
-                        startQuiz(category, count);
+                    card.addEventListener('click', async () => {
+                        await startQuiz(category, count);
                     });
 
                     container.appendChild(card);
