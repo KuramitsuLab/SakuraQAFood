@@ -177,11 +177,14 @@ const Analytics = {
         const totalQuestions = this.questions.length;
 
         this.allReviewers.forEach(reviewer => {
-            // このレビュアーの回答数を取得
+            // このレビュアーの回答数を取得（ユニークな問題IDのみ）
             const reviewerAnswers = this.reviews.filter(r =>
                 (r.reviewer_name || r.reviewerName) === reviewer
             );
-            const answerCount = reviewerAnswers.length;
+            const uniqueQuestionIds = new Set(
+                reviewerAnswers.map(r => r.question_id || r.questionId)
+            );
+            const answerCount = uniqueQuestionIds.size;
             const isCompleted = answerCount >= totalQuestions;
 
             const checkboxDiv = document.createElement('div');
@@ -317,21 +320,36 @@ const Analytics = {
 
         this.enrichedReviews.forEach(review => {
             const reviewer = review.reviewer_name || review.reviewerName || 'Unknown';
+            const questionId = review.question_id || review.questionId;
 
             if (!stats[reviewer]) {
-                stats[reviewer] = { correct: 0, total: 0 };
+                stats[reviewer] = {
+                    correct: 0,
+                    total: 0,
+                    uniqueQuestions: new Set(),
+                    correctQuestions: new Set()
+                };
             }
 
-            stats[reviewer].total++;
-            if (review.is_correct || review.isCorrect) {
-                stats[reviewer].correct++;
+            // ユニークな問題のみカウント（最初の回答のみ）
+            if (!stats[reviewer].uniqueQuestions.has(questionId)) {
+                stats[reviewer].uniqueQuestions.add(questionId);
+                stats[reviewer].total++;
+
+                if (review.is_correct || review.isCorrect) {
+                    stats[reviewer].correctQuestions.add(questionId);
+                    stats[reviewer].correct++;
+                }
             }
         });
 
-        // 正答率を計算
+        // 正答率を計算（Setは削除）
         Object.keys(stats).forEach(reviewer => {
             const s = stats[reviewer];
             s.accuracy = s.total > 0 ? ((s.correct / s.total) * 100).toFixed(1) : 0;
+            // Setオブジェクトは削除（返却時には不要）
+            delete s.uniqueQuestions;
+            delete s.correctQuestions;
         });
 
         return stats;
